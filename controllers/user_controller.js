@@ -248,6 +248,7 @@ class UserController {
 
   loginUser(req,res){
     try {
+        console.log("login");
         user_schema.find({login: req.body.login}).exec().then(user =>{
         if(user.length < 1)
             return res.status(404).json({
