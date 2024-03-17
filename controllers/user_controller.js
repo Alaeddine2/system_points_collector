@@ -76,7 +76,7 @@ class UserController {
                 // Set expiration time is 24 hours.
                 user.activeExpires = Date.now() + 24 * 3600 * 1000;
                 
-                var link = 'http://localhost:'+process.env.PORT+'/v1/user/active/' + activationToken;
+                var link = 'https://system-points-collector.onrender.com/v1/user/active/' + activationToken;
                 // Send email to user.
                 // Sending activation email
                 mailer({
@@ -426,7 +426,7 @@ class UserController {
             // Set expiration time is 24 hours.
             user.activeToken = activationToken;
             user.activeExpires = Date.now() + 24 * 3600 * 1000;
-            var link = 'http://localhost:'+process.env.PORT+'/v1/user/active/' + activationToken;
+            var link = 'https://system-points-collector.onrender.com/v1/user/active/' + activationToken;
 
             // Save the user
             await user.save();
