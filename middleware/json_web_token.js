@@ -6,7 +6,7 @@ module.exports = {
     signJWT: 
     function(currentUser){
         return jwt.sign(currentUser, (process.env.ACCESS_TOKEN_SECRET || configs.JWT_KEY), {
-            expiresIn : process.env.JWT_TOKEN_EXPIRATION_TIME
+            expiresIn : "2h"//process.env.JWT_TOKEN_EXPIRATION_TIME
         })
     },
     authenticateToken: function (req, res, next){
