@@ -1,14 +1,185 @@
 const user_schema = require("../schemas/user_schema");
+const tracer_schema = require("../schemas/tracer_schema");
 const crypto = require('crypto');
 const jwtContainer = require("../middleware/json_web_token");
 const logger = require('../middleware/logging_middleware');
 require('dotenv').config()
 var mailer = require('../utils/mailer');
-
+const userMethodes = require("../utils/user");
+const menu_schema = require("../schemas/menu_schema");
 class UserController {
 
   constructor() {}
 
+  //update user points
+    async updatePoints(req, res){
+         // test if the user is professional
+        const currentUser = userMethodes.getUserFromToken(req);
+        if(currentUser.user.role_number != 1) {
+            //logger.error(`update user points [Path: v1/user/points/update/:id] ${currentUser.role} is not allowed to update points`)
+            res.status(500).json({
+                code: "API.USERPOINTS.PUT.ERROR",
+                message: "Error updating Points",
+                success: false,
+                data: "You are not allowed to update points"
+            });
+            return;
+        }
+        // test if the client exist
+        user_schema.findById(req.params.id).exec().then(users => {
+            if(users == null)
+                return res.status(404).json({
+                    code: "API.USERPOINTS.UPDATE.FAIL",
+                    message: "User not found",
+                    success: false,
+                    error: null
+                });
+                //test if the action is add poitns or moins points
+                if(req.body.action == 0){
+                    let newPoints = users.totalPoints + req.body.points;
+                    user_schema
+                    .findOneAndUpdate({ _id: req.params.id }, { $set: { totalPoints: newPoints } }, { new: true })
+                    .exec()
+                    .then(result => {
+                        //logger.info(`User points updated [Path: v1/user/points/update/:id] ${result}`)
+                        //save the tracer
+                        let newTracer = new tracer_schema({
+                            user_id: req.params.id,
+                            user: req.params.id,
+                            proffessional_id: currentUser.user._id,
+                            proffessional: currentUser.user._id,
+                            status: "done",
+                            description: req.body.description,
+                            action: 0,
+                            points: req.body.points,
+                        });
+                        newTracer.save().then( result => {
+                          //  logger.info(`New tracer saved [Path: v1/user/points/update/:id] ${result}`)
+                        }).catch(err => {
+                            //logger.error(`New tracer creation error [Path: v1/user/points/update/:id] ${err}`)
+                        });
+                        return res.status(200).json({
+                            code: "API.USERPOINTS.UPDATE.SUCESS",
+                            message: "User points updated successfully",
+                            success: true,
+                            result: result
+                        });
+                    }
+                    ).catch(err => {
+                        ///logger.error(`error User points updated [Path: v1/user/points/update/:id] ${err}`)
+                        return res.status(400).json({
+                            code: "API.USERPOINTS.UPDATE.FAIL",
+                            message: "User points updating failed",
+                            success: false,
+                            error: err
+                        });
+                    });
+                }else{
+                    console.log(users);
+                    let newPoints = users.totalPoints - req.body.points;
+                    //test if the user has enough points
+                    if(newPoints < 0){
+                        return res.status(404).json({
+                            code: "API.USERPOINTS.UPDATE.FAIL",
+                            message: "User has not enough points",
+                            success: false,
+                            error: "User has not enough points"
+                        });
+                    }
+                    user_schema
+                    .findOneAndUpdate({ _id: req.params.id }, { $set: { totalPoints: newPoints } }, { new: true })
+                    .exec()
+                    .then(result => {
+                        //logger.info(`User points updated [Path: v1/user/points/update/:id] ${result}`)
+                        //save the tracer
+                        let newTracer = new tracer_schema({
+                            user_id: req.params.id,
+                            user: req.params.id,
+                            proffessional_id: currentUser.user._id,
+                            proffessional: currentUser.user._id,
+                            status: "done",
+                            description: req.body.description,
+                            action: 1,
+                            points: req.body.points,
+                            menuList: req.body.menuList
+                        });
+                        newTracer.save().then( result => {
+                          //  logger.info(`New tracer saved [Path: v1/user/points/update/:id] ${result}`)
+                        }).catch(err => {
+                           // logger.error(`New tracer creation error [Path: v1/user/points/update/:id] ${err}`)
+                        });
+                        return res.status(200).json({
+                            code: "API.USERPOINTS.UPDATE.SUCESS",
+                            message: "User points updated successfully",
+                            success: true,
+                            result: result
+                        });
+                    }
+                    ).catch(err => {
+                        //logger.error(`error User points updated [Path: v1/user/points/update/:id] ${err}`)
+                        return res.status(400).json({
+                            code: "API.USERPOINTS.UPDATE.FAIL",
+                            message: "User points updating failed",
+                            success: false,
+                            error: err
+                        });
+                    });
+                }
+            }).catch(err => {
+                //logger.error(`error User points updated [Path: v1/user/points/update/:id] ${err}`)
+                return res.status(404).json({
+                    code: "API.USERPOINTS.UPDATE.FAIL",
+                    message: "check fields",
+                    success: false,
+                    error: err
+                });
+            });
+            
+    }
+
+    //get all user tracer points
+    async getAllPoints(req, res){
+        const currentUser = userMethodes.getUserFromToken(req);
+        // get all user tracer points
+        tracer_schema.find({user_id: currentUser.user._id}).populate("user").populate("proffessional").exec().then(result => {
+            //logger.info(`get all user tracer points [Path: v1/user/points/all]`)
+            // if menuList is not empty, populate the menuList
+            /*if(result.length > 0){
+                result.forEach(element => {
+                    console.log(element.menuList.length);
+                    if(element.menuList.length > 0){
+                        menu_schema.find({_id: { $in: element.menuList }}).exec().then(menus => {
+                            element.menuList = menus;
+                        }).catch(err => {
+                            logger.error(`error get all user tracer points [Path: v1/user/points/all] ${err}`)
+                        });
+                    }
+                });
+            }*/
+
+            res.status(200).json({
+                code: "API.USERPOINTS.GET.SUCESS",
+                message: "All User tracer points fetched successfully",
+                success: true,
+                result: result
+            });
+        }
+        ).catch(err => {
+            //logger.error(`error get all user tracer points [Path: v1/user/points/all] ${err}`)
+            res.status(400).json({
+                code: "API.USERPOINTS.GET.FAIL",
+                message: "All User tracer points fetching failed",
+                success: false,
+                error: err
+            });
+        }
+        );
+    }
+
+
+
+
+    // Activate user
   async activateUser(req, res) {
     try {
         // Find the corresponding user
@@ -50,7 +221,7 @@ class UserController {
         .exec()
         .then(user => {
             if(user.length > 0){
-                logger.error(`New user creation error [Path: v1/user/add] : user already exist`)
+              ///  logger.error(`New user creation error [Path: v1/user/add] : user already exist`)
                 return res.status(400).json({
                     code: "API.USER.CREATION.FAIL",
                     message: "User already exist",
@@ -87,7 +258,7 @@ class UserController {
                 newUser.activeToken = activationToken;
                 newUser.activeExpires = Date.now() + 24 * 3600 * 1000;
             return newUser.save().then( result =>{
-                logger.info(`New user saved [Path: v1/user/add] ${result}`)
+                //logger.info(`New user saved [Path: v1/user/add] ${result}`)
                 res.status(200).json({
                     code: "API.USER.CREATION.SUCESS",
                     message: "new customer added successfully, The activation email has been sent click the activation link within 24 hours",
@@ -95,7 +266,7 @@ class UserController {
                     data: result
                 })
             }).catch(err => {
-                logger.error(`New user creation error [Path: v1/user/add] ${err}`)
+                //logger.error(`New user creation error [Path: v1/user/add] ${err}`)
                 res.status(400).json({
                     code: "API.USER.CREATION.FAIL",
                     message: "adding User failed",
@@ -104,7 +275,7 @@ class UserController {
                 })
             })
         }).catch(err => {
-            logger.error(`New user creation error [Path: v1/user/add] ${err}`)
+            //logger.error(`New user creation error [Path: v1/user/add] ${err}`)
             return res.status(404).json({
                 code: "API.CUSTOMER.NOTFOUND",
                 message: "customer id not found",
@@ -123,7 +294,7 @@ class UserController {
     .exec()
     .then(user => {
         if(user.length > 0){
-            logger.error(`New PRO creation error [Path: v1/user/pro/add] : PRO already exist`)
+            //logger.error(`New PRO creation error [Path: v1/user/pro/add] : PRO already exist`)
             return res.status(400).json({
                 code: "API.PRO.CREATION.FAIL",
                 message: "PRO already exist",
@@ -143,7 +314,7 @@ class UserController {
             active: true,
         });
         return newUser.save().then( result =>{
-            logger.info(`New pro saved [Path: v1/user/add] ${result}`)
+            //logger.info(`New pro saved [Path: v1/user/add] ${result}`)
             res.status(200).json({
                 code: "API.PRO.CREATION.SUCESS",
                 message: "new professional added successfully",
@@ -151,7 +322,7 @@ class UserController {
                 data: result
             })
         }).catch(err => {
-            logger.error(`New PRO creation error [Path: v1/user/pro/add] ${err}`)
+            //logger.error(`New PRO creation error [Path: v1/user/pro/add] ${err}`)
             res.status(400).json({
                 code: "API.PRO.CREATION.FAIL",
                 message: "adding PRO failed",
@@ -160,7 +331,7 @@ class UserController {
             })
         })
     }).catch(err => {
-        logger.error(`New user creation error [Path: v1/user/add] ${err}`)
+        ///logger.error(`New user creation error [Path: v1/user/add] ${err}`)
         return res.status(404).json({
             code: "API.CUSTOMER.NOTFOUND",
             message: "customer id not found",
@@ -178,7 +349,7 @@ class UserController {
         .limit(req.body.limit)
         .exec()
         .then(result => {
-            logger.info(`get users [Path: v1/user/all]`)
+           // logger.info(`get users [Path: v1/user/all]`)
             res.status(200).json({
                 code: "API.User.GET.SUCESS",
                 message: "All Users fetched successfully",
@@ -187,7 +358,7 @@ class UserController {
             });
         }
         ).catch(err => {
-            logger.error(`get users error [Path: v1/user/all] ${err}`)
+           /// logger.error(`get users error [Path: v1/user/all] ${err}`)
             res.status(400).json({
                 code: "API.User.GET.FAIL",
                 message: "All Users fetching failed",
@@ -217,7 +388,7 @@ class UserController {
         .limit(req.body.limit)
         .exec()
         .then(result => {
-            logger.info(`get users by costumer [Path: v1/user/customer]`)
+            //logger.info(`get users by costumer [Path: v1/user/customer]`)
             res.status(200).json({
                 code: "API.User.CUSTOMER.GET.SUCESS",
                 message: "All Users fetched successfully",
@@ -226,7 +397,7 @@ class UserController {
             });
         }
         ).catch(err => {
-            logger.error(`error get users by costumer [Path: v1/user/customer] ${err}`)
+            //logger.error(`error get users by costumer [Path: v1/user/customer] ${err}`)
             res.status(400).json({
                 code: "API.User.CUSTOMER.GET.FAIL",
                 message: "All Users fetching failed",
@@ -235,7 +406,7 @@ class UserController {
             });
         }
         ).catch(err => {
-            logger.error(`error get users by costumer [Path: v1/user/customer] ${err}`)
+            ///logger.error(`error get users by costumer [Path: v1/user/customer] ${err}`)
             return res.status(404).json({
                 code: "API.CUSTOMER.NOTFOUND",
                 message: "customer id not found",
@@ -266,7 +437,7 @@ class UserController {
                 error: null
             });
         if(crypto.createHash('sha256').update(req.body.password).digest('hex') == user[0].passwordHash){
-            logger.info(`login [Path: v1/user/auth] ${user[0]}`)
+            //logger.info(`login [Path: v1/user/auth] ${user[0]}`)
             return res.status(200).json({
                 code: "API.LOGIN.USER.SUCESS",
                 message: "success login",
@@ -277,7 +448,7 @@ class UserController {
                 }
             });
         }else{
-            logger.error(`error login [Path: v1/user/auth] :wrong password`)
+           // logger.error(`error login [Path: v1/user/auth] :wrong password`)
             return res.status(401).json({
                 code: "API.LOGIN.USER.WRONGPASSWORD",
                 message: "invalid User password",
@@ -287,7 +458,7 @@ class UserController {
         }
         })
     } catch (error) {
-        logger.error(`error login [Path: v1/user/auth] ${error}`)
+        //logger.error(`error login [Path: v1/user/auth] ${error}`)
         return res.status(400).json({
             code: "API.LOGIN.USER.FAILD",
             message: "login failed",
@@ -310,7 +481,7 @@ class UserController {
                 .findOneAndUpdate({ _id: req.params.id }, { $set: { name: req.body.name, login: req.body.login, tel: req.body.tel } }, { new: true })
                 .exec()
                 .then(result => {
-                    logger.info(`User [Path: v1/user/update] ${req.params.id}`)
+          //          logger.info(`User [Path: v1/user/update] ${req.params.id}`)
                     res.status(200).json({
                         code: "API.USER.UPDATE.SUCESS",
                         message: "User updated successfully",
@@ -319,7 +490,7 @@ class UserController {
                     });
                 }
                 ).catch(err => {
-                    logger.error(`User [Path: v1/user/update] ${err}`)
+            //        logger.error(`User [Path: v1/user/update] ${err}`)
                     res.status(400).json({
                         code: "API.CUSTOMER.UPDATE.FAIL",
                         message: "Customer updating failed",
@@ -328,7 +499,7 @@ class UserController {
                     });
                 });
         }).catch(err =>{
-            logger.error(`User [Path: v1/user/update] ${err}`)
+            //logger.error(`User [Path: v1/user/update] ${err}`)
             res.status(404).json({
                 code: "API.USER.UPDATE.FAIL",
                 message: "check fields",
@@ -458,7 +629,7 @@ class UserController {
             .deleteOne({ _id: req.params.id })
             .exec()
             .then(deletingResult => {
-                logger.info(`User deleted [Path: v1/user/delete] ${req.params.id}`)
+              //  logger.info(`User deleted [Path: v1/user/delete] ${req.params.id}`)
                 res.status(200).json({
                     code: "API.USER.DELETE.SUCESS",
                     message: "USER deleted successfully",
@@ -467,7 +638,7 @@ class UserController {
                 });
             }
             ).catch(err => {
-                logger.error(`error User delete [Path: v1/user/delete] ${err}`)
+                //logger.error(`error User delete [Path: v1/user/delete] ${err}`)
                 res.status(400).json({
                     code: "API.USER.DELETE.FAIL",
                     message: "USER deletion failed",
@@ -494,7 +665,7 @@ class UserController {
                     .findOneAndUpdate({ _id: req.params.id }, { $set: { hasAccessToAllDevices: req.body.hasAccess, deviceArray: req.body.devices } }, { new: true })
                     .exec()
                     .then(result => {
-                        logger.info(`User updated [Path: v1/user/update/privilage] ${result}`)
+                  //      logger.info(`User updated [Path: v1/user/update/privilage] ${result}`)
                         res.status(200).json({
                             code: "API.USER.PRIVILAGE.PERMISSION.SUCESS",
                             message: "User updating privalage successfully",
@@ -503,7 +674,7 @@ class UserController {
                         });
                     }
                     ).catch(err => {
-                        logger.error(`error User updating [Path: v1/user/update/privilage] ${err}`)
+                    //    logger.error(`error User updating [Path: v1/user/update/privilage] ${err}`)
                         res.status(400).json({
                             code: "API.USER.PRIVILAGE.ERROR.FAIL",
                             message: "User updating privalage failed",
@@ -513,7 +684,7 @@ class UserController {
                     });
             })
         } catch (error) {
-            logger.error(`error User updating [Path: v1/user/update/privilage] ${error}`)
+            //logger.error(`error User updating [Path: v1/user/update/privilage] ${error}`)
             res.status(400).json({
                 code: "API.USER.PRIVILAGE.ERROR.FAIL",
                 message: "User updating privalage failed",

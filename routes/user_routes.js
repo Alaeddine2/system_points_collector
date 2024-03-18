@@ -40,4 +40,11 @@ router.put("/update/token/:id",jwtContainer.authenticateToken ,(req, res) => Use
 router.get('/active/:activeToken', (req, res) =>
     UserControllerInst.activateUser(req, res)
 );
+
+//change client total points
+router.put("/points/update/:id",jwtContainer.authenticateToken ,(req, res) => UserControllerInst.updatePoints(req,res));
+// get all client tracer points use 
+router.get('/points/all',jwtContainer.authenticateToken, (req,res)=> {
+    UserControllerInst.getAllPoints(req,res);
+});
 module.exports = router;

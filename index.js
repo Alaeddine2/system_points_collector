@@ -26,5 +26,5 @@ app.use(express.static('public'));
 
 const server = app.listen(process.env.PORT, function () {
     console.log("backend server is running on port : " + (process.env.PORT));
-    logger.info(`Server started and running on ${process.env.PORT}`)
+  //  logger.info(`Server started and running on ${process.env.PORT}`)
 });
