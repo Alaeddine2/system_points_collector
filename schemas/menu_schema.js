@@ -23,6 +23,15 @@ const schema = new mongoose.Schema({
   imgUrl: {
     type: String
   },
+  category: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "m_categories",
+    required: true
+  },
+  category_id: {
+    type: String,
+    required: true
+  },
   isAvailable: {
     type: Boolean,
     default: true
